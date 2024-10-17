@@ -1,0 +1,201 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.datasets import load_diabetes, load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import GaussianNB
+from sklearn.decomposition import PCA
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+
+# Helper function to evaluate the model
+def evaluate_model(y_test, y_pred, title="Confusion Matrix", plot=False):
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred)
+    recall = recall_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
+
+    if plot:
+        print(f"Accuracy: {accuracy:.4f}")
+        print(f"Precision: {precision:.4f}")
+        print(f"Recall: {recall:.4f}")
+        print(f"F1 Score: {f1:.4f}")
+
+        # Plot confusion matrix
+        conf_matrix = confusion_matrix(y_test, y_pred)
+        sns.heatmap(conf_matrix, annot=True, fmt='d')
+        plt.xlabel("Predicted")
+        plt.ylabel("True")
+        plt.title(title)
+        plt.show()
+
+    return accuracy, precision, recall, f1
+
+
+# Problem 1: Logistic Regression for Diabetes Dataset
+diabetes_data = load_diabetes()
+X_diabetes = diabetes_data.data
+y_diabetes = (diabetes_data.target > 140).astype(int)
+
+# Split data
+X_train_dia, X_test_dia, y_train_dia, y_test_dia = train_test_split(X_diabetes, y_diabetes, test_size=0.2, random_state=42)
+
+# Scale data
+scaler = StandardScaler()
+X_train_dia_scaled = scaler.fit_transform(X_train_dia)
+X_test_dia_scaled = scaler.transform(X_test_dia)
+
+# Train Logistic Regression
+model_diabetes = LogisticRegression(max_iter=1000)
+model_diabetes.fit(X_train_dia_scaled, y_train_dia)
+
+# Predict and evaluate
+y_pred_dia = model_diabetes.predict(X_test_dia_scaled)
+print("\nProblem 1 - Diabetes Logistic Regression")
+evaluate_model(y_test_dia, y_pred_dia, plot=True)
+
+
+# Problem 2: Logistic Regression for Cancer Dataset (with and without penalty)
+cancer_data = load_breast_cancer()
+X_cancer = cancer_data.data
+y_cancer = cancer_data.target  # 0 = malignant, 1 = benign
+
+# Split data
+X_train_cancer, X_test_cancer, y_train_cancer, y_test_cancer = train_test_split(X_cancer, y_cancer, test_size=0.2, random_state=42)
+
+# Scale data
+X_train_cancer_scaled = scaler.fit_transform(X_train_cancer)
+X_test_cancer_scaled = scaler.transform(X_test_cancer)
+
+# Train Logistic Regression (without penalty)
+model_cancer = LogisticRegression(max_iter=1000)
+model_cancer.fit(X_train_cancer_scaled, y_train_cancer)
+
+# Predict and evaluate
+y_pred_cancer = model_cancer.predict(X_test_cancer_scaled)
+print("\nProblem 2 - Cancer Logistic Regression (No Penalty)")
+evaluate_model(y_test_cancer, y_pred_cancer, plot=True)
+
+# Train Logistic Regression (with L2 penalty)
+model_cancer_penalty = LogisticRegression(max_iter=1000, penalty='l2')
+model_cancer_penalty.fit(X_train_cancer_scaled, y_train_cancer)
+
+# Predict and evaluate
+y_pred_cancer_penalty = model_cancer_penalty.predict(X_test_cancer_scaled)
+print("\nProblem 2 - Cancer Logistic Regression (With Penalty)")
+evaluate_model(y_test_cancer, y_pred_cancer_penalty, plot=True)
+
+
+# Problem 3: Naive Bayes for Cancer Dataset
+model_nb = GaussianNB()
+model_nb.fit(X_train_cancer_scaled, y_train_cancer)
+
+# Predict and evaluate
+y_pred_nb = model_nb.predict(X_test_cancer_scaled)
+print("\nProblem 3 - Cancer Naive Bayes")
+evaluate_model(y_test_cancer, y_pred_nb, plot=True)
+
+
+# Problem 4: PCA with Logistic Regression for Cancer Dataset
+k_values = []
+accuracy_scores_lr = []
+precision_scores_lr = []
+recall_scores_lr = []
+f1_scores_lr = []
+
+best_k_lr = 0
+best_f1_lr = 0
+
+for k in range(1, X_cancer.shape[1] + 1):
+    # Apply PCA
+    pca = PCA(n_components=k)
+    X_train_pca = pca.fit_transform(X_train_cancer_scaled)
+    X_test_pca = pca.transform(X_test_cancer_scaled)
+
+    # Train Logistic Regression
+    model_pca_lr = LogisticRegression(max_iter=1000)
+    model_pca_lr.fit(X_train_pca, y_train_cancer)
+
+    # Predict and evaluate
+    accuracy, precision, recall, f1 = evaluate_model(y_test_cancer, model_pca_lr.predict(X_test_pca), plot=False)
+
+    # Store metrics
+    k_values.append(k)
+    accuracy_scores_lr.append(accuracy)
+    precision_scores_lr.append(precision)
+    recall_scores_lr.append(recall)
+    f1_scores_lr.append(f1)
+
+    # Track best F1 score
+    if f1 > best_f1_lr:
+        best_f1_lr = f1
+        best_k_lr = k
+
+# Output optimal k for Logistic Regression with PCA
+print("\nProblem 4 - Cancer logical regression (PCA feature extraction)")
+print(f"Optimal k for Logistic Regression with PCA: {best_k_lr}, F1 Score: {best_f1_lr:.4f}")
+
+# Plot metrics over k for Logistic Regression with PCA
+plt.figure(figsize=(12, 8))
+plt.plot(k_values, accuracy_scores_lr, label='Accuracy', marker='o')
+plt.plot(k_values, precision_scores_lr, label='Precision', marker='o')
+plt.plot(k_values, recall_scores_lr, label='Recall', marker='o')
+plt.plot(k_values, f1_scores_lr, label='F1 Score', marker='o')
+plt.xlabel('Number of PCA Components (k)')
+plt.ylabel('Score')
+plt.title('Logistic Regression Performance with PCA (varying k)')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# Problem 5: PCA with Naive Bayes for Cancer Dataset
+accuracy_scores_nb = []
+precision_scores_nb = []
+recall_scores_nb = []
+f1_scores_nb = []
+
+best_k_nb = 0
+best_f1_nb = 0
+
+for k in range(1, X_cancer.shape[1] + 1):
+    # Apply PCA
+    pca = PCA(n_components=k)
+    X_train_pca = pca.fit_transform(X_train_cancer_scaled)
+    X_test_pca = pca.transform(X_test_cancer_scaled)
+
+    # Train Naive Bayes
+    model_pca_nb = GaussianNB()
+    model_pca_nb.fit(X_train_pca, y_train_cancer)
+
+    # Predict and evaluate
+    accuracy, precision, recall, f1 = evaluate_model(y_test_cancer, model_pca_nb.predict(X_test_pca), plot=False)
+
+    # Store metrics
+    accuracy_scores_nb.append(accuracy)
+    precision_scores_nb.append(precision)
+    recall_scores_nb.append(recall)
+    f1_scores_nb.append(f1)
+
+    # Track best F1 score
+    if f1 > best_f1_nb:
+        best_f1_nb = f1
+        best_k_nb = k
+
+# Output optimal k for Naive Bayes with PCA
+print("\nProblem 5 - Cancer naive bayes (PCA feature extraction)")
+print(f"Optimal k for Naive Bayes with PCA: {best_k_nb}, F1 Score: {best_f1_nb:.4f}")
+
+plt.figure(figsize=(12, 8))
+plt.plot(k_values, accuracy_scores_nb, label='Accuracy', marker='o')
+plt.plot(k_values, precision_scores_nb, label='Precision', marker='o')
+plt.plot(k_values, recall_scores_nb, label='Recall', marker='o')
+plt.plot(k_values, f1_scores_nb, label='F1 Score', marker='o')
+plt.xlabel('Number of PCA Components (k)')
+plt.ylabel('Score')
+plt.title('Naive Bayes Performance with PCA (varying k)')
+plt.legend()
+plt.grid(True)
+plt.show()
